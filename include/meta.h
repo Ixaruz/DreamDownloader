@@ -1,0 +1,1 @@
+#define ACNH_TITLE_ID        0x01006F8002326000
