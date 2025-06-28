@@ -24,7 +24,9 @@ void HttpRequest::setMimeType(MimeType type) {
 }
 
 void HttpRequest::applyMimeType() {
-    setHeader("Content-Type", mimeTypeToString(m_mime));
+    if (MimeType::None != m_mime) {
+        setHeader("Content-Type", mimeTypeToString(m_mime));
+    }
 }
 
 HttpRequest::MimeType HttpRequest::getMimeType() const { return m_mime; }

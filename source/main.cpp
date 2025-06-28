@@ -1,9 +1,7 @@
 #include <version.h>
 #include <meta.h>
-#include <net/AcbaaClient.hpp>
+#include <net/AcbaaWebServer.hpp>
 #include <helpers/BuildIdHelper.hpp>
-
-#include <msgpack.hpp>
 
 // Include the main libnx system header, for Switch development
 #include <switch.h>
@@ -12,28 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <iostream>
 #include <sstream>
-
-struct AuthInfo {
-    msgpack::type::fix_int64 id;
-    std::string password;
-
-    MSGPACK_DEFINE_MAP(id, password);
-};
-
-void print_hex_stream(std::stringstream& ss, std::size_t wrap_every = 16) {
-    std::string data = ss.str();
-    for (std::size_t i = 0; i < data.size(); ++i) {
-        unsigned char byte = static_cast<unsigned char>(data[i]);
-        printf("%02x ", byte);
-
-        if ((i + 1) % wrap_every == 0)
-            printf("\n");
-    }
-    if (data.size() % wrap_every != 0)
-        printf("\n");
-}
 
 void initSwitchModules()
 {
@@ -42,10 +19,10 @@ void initSwitchModules()
     if (R_FAILED(r))
         printf("ERROR initializing socket: %d\n", R_DESCRIPTION(r));
 
-    r = fsInitialize();
-    if (R_FAILED(r))
-        printf("ERROR initializing fs: %d\n", R_DESCRIPTION(r));
-
+    signed int nxlinkStdioR = nxlinkStdio();
+    if (nxlinkStdioR < 0)
+        printf("ERROR initializing nxlinkStdio: %d\n", nxlinkStdioR);
+        
     r = setsysInitialize();
     if (R_FAILED(r))
         printf("ERROR initializing setsys: %d\n", R_DESCRIPTION(r));
@@ -62,7 +39,6 @@ void exitSwitchModules()
     // Exit the loaded modules in reversed order we loaded them
     dmntchtExit();
     setsysExit();
-    fsExit();
     socketExit();
 }
 
@@ -80,8 +56,10 @@ int main(int argc, char* argv[])
 
     initSwitchModules();
     
-    dmntchtForceOpenCheatProcess();
+    printf("%s %s", PROJECT_NAME, PROJECT_VERSION);
     
+    dmntchtForceOpenCheatProcess();
+
     BuildIdHelper::verifyBid();
     
     u64 tokenOffset = 0x5128FE0;
@@ -96,22 +74,21 @@ int main(int argc, char* argv[])
     std::string tokenStr(reinterpret_cast<const char*>(token), sizeof(token) / sizeof(token[0]));
 
     printf("Token: %s\n", tokenStr.c_str());
-    
-    if (!tokenStr.empty())
+    static AcbaaWebServer server(tokenStr);
+    if (!tokenStr.empty() && 0 != tokenStr[0])
     {
-        AcbaaClient acbaaClient(tokenStr);
-        HttpRequest::Reply reply;
-        acbaaClient.requestDreamLandsById(987127517673, reply, /*debug*/ false);
         
-        std::stringstream replyss = std::stringstream(reply.body);
-        print_hex_stream(replyss);
-        // printf("%s\n", reply.body.c_str());
-        
-        msgpack::object_handle oh = msgpack::unpack(reply.body.data(), reply.body.size());
-        msgpack::object deserialized = oh.get();
-        std::cout << deserialized << std::endl;
+        if (!server.start(SERVER_PORT)) {
+            printf("Failed to start server\n");
+        }
+        else {
+            printf("Server running on port %ld...\n", SERVER_PORT);
+            // Run the server in a separate thread
+        }
     }
-    
+    else {
+        printf("Token was empty.");
+    }
     // Main loop
     while(appletMainLoop())
     {
@@ -125,7 +102,8 @@ int main(int argc, char* argv[])
         if (kDown & HidNpadButton_Plus)
             break; // break in order to return to hbmenu
 
-        // Your code goes here
+        // Handle one step of the server (non-blocking)
+        server.serverLoop();
 
         // Update the console, sending a new frame to the display
         consoleUpdate(NULL);

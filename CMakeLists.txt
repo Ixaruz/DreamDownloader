@@ -15,9 +15,6 @@ set(CMAKE_CXX_STANDARD 20)
         
 set(CMAKE_PREFIX_PATH "${DEVKITPRO};${CMAKE_PREFIX_PATH}")
 
-# include subdirectory
-add_subdirectory(libs)
-
 configure_file(
     "${CMAKE_CURRENT_SOURCE_DIR}/include/version.h.in"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/version.h"
@@ -26,7 +23,7 @@ configure_file(
 
 set(SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/source/main.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/source/net/AcbaaClient.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/source/net/AcbaaWebServer.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/source/net/HttpClient.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/source/net/HttpRequest.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/source/helpers/BuildIdHelper.cpp"
@@ -50,7 +47,6 @@ find_package(PkgConfig REQUIRED)
 pkg_check_modules(libcurl REQUIRED IMPORTED_TARGET libcurl)
 
 target_link_libraries(DreamDownloader
-    PRIVATE msgpack-cxx
     PRIVATE PkgConfig::libcurl
     )
 
