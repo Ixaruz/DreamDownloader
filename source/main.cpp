@@ -56,7 +56,7 @@ int main(int argc, char* argv[])
 
     initSwitchModules();
     
-    printf("%s %s", PROJECT_NAME, PROJECT_VERSION);
+    printf("%s %s\n\n", PROJECT_NAME, PROJECT_VERSION);
     
     dmntchtForceOpenCheatProcess();
 
@@ -83,7 +83,7 @@ int main(int argc, char* argv[])
         }
         else {
             printf("Server running on port %ld...\n", SERVER_PORT);
-            // Run the server in a separate thread
+            
         }
     }
     else {
