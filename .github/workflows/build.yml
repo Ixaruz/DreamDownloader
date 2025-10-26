@@ -1,0 +1,54 @@
+# .github/workflows/build.yml
+name: Build
+on:
+    push:
+        branches: [ main ]
+
+    workflow_dispatch:
+        inputs:
+            BUILD_VERSION:
+                description: 'Version of the build'
+                required: false
+                default: '0.0.0'
+
+jobs:
+    build:
+        runs-on: ubuntu-latest
+        container:
+            image: devkitpro/devkita64
+        env:
+            BUILD_VERSION: ${{ github.event.inputs.BUILD_VERSION }}
+        steps:
+          - name: Checkout repository
+            uses: actions/checkout@v4
+            with:
+                submodules: recursive
+
+          - name: Build application
+            run: |
+                set -e
+                echo "Building with BUILD_VERSION=${BUILD_VERSION}"
+                catnip -t Switch -D BUILD_VERSION="${BUILD_VERSION}"
+
+          - name: Verify build artifact exists
+            run: |
+                if [ ! -f build/main.release/DreamDownloader.nro ]; then
+                    echo "ERROR: build/main.release/DreamDownloader.nro not found"
+                    ls -la build || true
+                    exit 1
+                fi
+
+          - name: Prepare artifacts layout
+            run: |
+                set -e
+                mkdir -p switch/DreamDownloader
+                cp build/main.release/DreamDownloader.nro switch/DreamDownloader/DreamDownloader.nro
+
+          - name: Upload artifacts
+            uses: actions/upload-artifact@v4
+            with:
+                name: DreamDownloader
+                path: |
+                    switch/DreamDownloader/DreamDownloader.nro
+                    client/client.py
+                    client/requirements.txt
