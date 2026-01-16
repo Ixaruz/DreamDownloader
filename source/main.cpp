@@ -22,7 +22,7 @@ void initSwitchModules()
     signed int nxlinkStdioR = nxlinkStdio();
     if (nxlinkStdioR < 0)
         printf("ERROR initializing nxlinkStdio: %d\n", nxlinkStdioR);
-        
+
     r = setsysInitialize();
     if (R_FAILED(r))
         printf("ERROR initializing setsys: %d\n", R_DESCRIPTION(r));
@@ -55,14 +55,14 @@ int main(int argc, char* argv[])
     padInitializeDefault(&pad);
 
     initSwitchModules();
-    
+
     printf("%s %s\n\n", PROJECT_NAME, PROJECT_VERSION);
-    
+
     dmntchtForceOpenCheatProcess();
 
     BuildIdHelper::verifyBid();
-    
-    u64 tokenOffset = 0x5128FE0;
+
+    u64 tokenOffset = 0x4B80678; 
     DmntCheatProcessMetadata metadata;
     dmntchtGetCheatProcessMetadata(&metadata);
     u8 token[0x5c];
@@ -70,20 +70,29 @@ int main(int argc, char* argv[])
     printf("Title ID: %016llx\n", metadata.title_id);
     printf("Main NSO Base: %016llx\n", metadata.main_nso_extents.base);
     dmntchtReadCheatProcessMemory(metadata.main_nso_extents.base + tokenOffset, &token, sizeof(token));
-    
+
     std::string tokenStr(reinterpret_cast<const char*>(token), sizeof(token) / sizeof(token[0]));
 
     printf("Token: %s\n", tokenStr.c_str());
     static AcbaaWebServer server(tokenStr);
+    SetSysSleepSettings currentSysSleepSettings;
     if (!tokenStr.empty() && 0 != tokenStr[0])
     {
-        
+
         if (!server.start(SERVER_PORT)) {
             printf("Failed to start server\n");
         }
         else {
             printf("Server running on port %ld...\n", SERVER_PORT);
-            
+
+            // prevent sleep while program is running
+
+            setsysGetSleepSettings(&currentSysSleepSettings);
+            SetSysSleepSettings awakeSysSleepSettings = currentSysSleepSettings;
+            awakeSysSleepSettings.console_sleep_plan = SetSysConsoleSleepPlan::SetSysConsoleSleepPlan_Never;
+            awakeSysSleepSettings.handheld_sleep_plan = SetSysHandheldSleepPlan::SetSysHandheldSleepPlan_Never;
+            setsysSetSleepSettings(&awakeSysSleepSettings);
+
         }
     }
     else {
@@ -110,6 +119,8 @@ int main(int argc, char* argv[])
     }
 
     exitSwitchModules();
+    // restore SleepSettings
+    setsysSetSleepSettings(&currentSysSleepSettings);
     // Deinitialize and clean up resources used by the console (important!)
     consoleExit(NULL);
     return 0;

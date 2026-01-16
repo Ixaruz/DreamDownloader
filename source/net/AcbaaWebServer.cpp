@@ -91,7 +91,7 @@ AcbaaWebServer::AcbaaWebServer(const std::string& bearerToken)
     : m_serverFd(-1),
       m_running(false),
       m_bearerToken(bearerToken),
-      m_userAgent("libcurl/7.64.1 (HAC; nnEns; SDK 10.9.8.0)"),
+      m_userAgent("libcurl/7.64.1 (HAC; nnEns; SDK 20.5.4.0)"),
       m_baseUrl("https://api.hac.lp1.acbaa.srv.nintendo.net") {
     initRouteRequestBuilders();
 }
