@@ -1,7 +1,8 @@
 #include <version.h>
 #include <meta.h>
 #include <net/AcbaaWebServer.hpp>
-#include <helpers/BuildIdHelper.hpp>
+#include <helpers/GameValidator.hpp>
+#include <helpers/debugger.hpp>
 
 // Include the main libnx system header, for Switch development
 #include <switch.h>
@@ -11,6 +12,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sstream>
+#include <memory>
 
 void initSwitchModules()
 {
@@ -19,17 +21,13 @@ void initSwitchModules()
     if (R_FAILED(r))
         printf("ERROR initializing socket: %d\n", R_DESCRIPTION(r));
 
-    signed int nxlinkStdioR = nxlinkStdio();
-    if (nxlinkStdioR < 0)
-        printf("ERROR initializing nxlinkStdio: %d\n", nxlinkStdioR);
+    /*signed int nxlinkStdioR = */ nxlinkStdio();
+    // if (nxlinkStdioR < 0)
+    //     printf("ERROR initializing nxlinkStdio: %d\n", nxlinkStdioR);
 
     r = setsysInitialize();
     if (R_FAILED(r))
         printf("ERROR initializing setsys: %d\n", R_DESCRIPTION(r));
-
-    r = dmntchtInitialize();
-    if (R_FAILED(r))
-        printf("ERROR initializing dmnt:cht: %d\n", R_DESCRIPTION(r));
 }
 
 
@@ -37,7 +35,6 @@ void initSwitchModules()
 void exitSwitchModules()
 {
     // Exit the loaded modules in reversed order we loaded them
-    dmntchtExit();
     setsysExit();
     socketExit();
 }
@@ -56,48 +53,65 @@ int main(int argc, char* argv[])
 
     initSwitchModules();
 
-    printf("%s %s\n\n", PROJECT_NAME, PROJECT_VERSION);
+    printf("%s %s\n\n", PROJECT_NAME, BUILD_VERSION);
 
-    dmntchtForceOpenCheatProcess();
+    bool hasError = false;
+    GameValidator validator;
+    if (!validator.validateGame()) {
+        printf("Invalid/no game detected.\n");
+        hasError = true;
+    }
+    if (!hasError && !validator.validateVersion()) {
+        printf("Invalid/no game version detected.\n");
+        hasError = true;
+    }
 
-    BuildIdHelper::verifyBid();
+    std::unique_ptr<AcbaaWebServer> server;
 
-    u64 tokenOffset = 0x4B80678; 
-    DmntCheatProcessMetadata metadata;
-    dmntchtGetCheatProcessMetadata(&metadata);
-    u8 token[0x5c];
-    printf("Process ID: %016llx\n", metadata.process_id);
-    printf("Title ID: %016llx\n", metadata.title_id);
-    printf("Main NSO Base: %016llx\n", metadata.main_nso_extents.base);
-    dmntchtReadCheatProcessMemory(metadata.main_nso_extents.base + tokenOffset, &token, sizeof(token));
-
-    std::string tokenStr(reinterpret_cast<const char*>(token), sizeof(token) / sizeof(token[0]));
-
-    printf("Token: %s\n", tokenStr.c_str());
-    static AcbaaWebServer server(tokenStr);
     SetSysSleepSettings currentSysSleepSettings;
-    if (!tokenStr.empty() && 0 != tokenStr[0])
-    {
+    setsysGetSleepSettings(&currentSysSleepSettings);
 
-        if (!server.start(SERVER_PORT)) {
-            printf("Failed to start server\n");
+    if (!hasError) {
+        Debugger debugger;
+        Result r = debugger.attachToProcessByTitleId(0x01006F8002326000);
+        if (R_FAILED(r)) {
+            printf("Failed to attach to process: %d\n", R_DESCRIPTION(r));
+        }
+        Debugger::CheatProcessMetadata metadata = debugger.getCheatProcessMetadata();
+        u64 tokenOffset = 0x4B80678;
+        u8 token[0x5c];
+        printf("Process ID: %d\n", metadata.process_id);
+        printf("Title ID: 0x%016llx\n", metadata.program_id);
+        printf("Main NSO Address: 0x%016llx\n", metadata.main_nso_extents.base);
+        debugger.readMemory(metadata.main_nso_extents.base + tokenOffset, &token, sizeof(token));
+
+        std::string tokenStr(reinterpret_cast<const char*>(token));
+
+        printf("Token: %s\n", tokenStr.c_str());
+        server = std::make_unique<AcbaaWebServer>(tokenStr);
+
+        if (!tokenStr.empty() && 0 != tokenStr[0])
+        {
+
+            if (!server->start(SERVER_PORT)) {
+                printf("Failed to start server\n");
+            }
+            else {
+                printf("Server running on port %ld...\n", SERVER_PORT);
+
+                // prevent sleep while program is running
+
+                SetSysSleepSettings awakeSysSleepSettings = currentSysSleepSettings;
+                awakeSysSleepSettings.console_sleep_plan = SetSysConsoleSleepPlan::SetSysConsoleSleepPlan_Never;
+                awakeSysSleepSettings.handheld_sleep_plan = SetSysHandheldSleepPlan::SetSysHandheldSleepPlan_Never;
+                setsysSetSleepSettings(&awakeSysSleepSettings);
+            }
         }
         else {
-            printf("Server running on port %ld...\n", SERVER_PORT);
-
-            // prevent sleep while program is running
-
-            setsysGetSleepSettings(&currentSysSleepSettings);
-            SetSysSleepSettings awakeSysSleepSettings = currentSysSleepSettings;
-            awakeSysSleepSettings.console_sleep_plan = SetSysConsoleSleepPlan::SetSysConsoleSleepPlan_Never;
-            awakeSysSleepSettings.handheld_sleep_plan = SetSysHandheldSleepPlan::SetSysHandheldSleepPlan_Never;
-            setsysSetSleepSettings(&awakeSysSleepSettings);
-
+            printf("Token was empty.");
         }
     }
-    else {
-        printf("Token was empty.");
-    }
+
     // Main loop
     while(appletMainLoop())
     {
@@ -111,17 +125,25 @@ int main(int argc, char* argv[])
         if (kDown & HidNpadButton_Plus)
             break; // break in order to return to hbmenu
 
-        // Handle one step of the server (non-blocking)
-        server.serverLoop();
+        // we love being explicit with this...
+        if (static_cast<bool>(server))
+        {
+            // Handle one step of the server (non-blocking)
+            server->serverLoop();
+        }
 
         // Update the console, sending a new frame to the display
         consoleUpdate(NULL);
+
     }
 
-    exitSwitchModules();
     // restore SleepSettings
     setsysSetSleepSettings(&currentSysSleepSettings);
+
+    exitSwitchModules();
+
     // Deinitialize and clean up resources used by the console (important!)
     consoleExit(NULL);
     return 0;
 }
+

@@ -26,8 +26,8 @@ set(SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/source/net/AcbaaWebServer.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/source/net/HttpClient.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/source/net/HttpRequest.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/source/helpers/BuildIdHelper.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/source/helpers/dmntcht.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/source/helpers/GameValidator.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/source/helpers/debugger.cpp"
     )
 
 message("SOURCES: ${SOURCES}")
