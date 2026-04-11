@@ -1,9 +1,13 @@
 cmake_minimum_required(VERSION 3.14)
 
 if(DEFINED BUILD_VERSION)
-    set(PROJECT_VERSION ${BUILD_VERSION})
+    string(REGEX MATCH "^[0-9]+\\.[0-9]+\\.[0-9]+" PROJECT_VERSION "${BUILD_VERSION}")
+
+    if(NOT PROJECT_VERSION)
+        message(FATAL_ERROR "Invalid BUILD_VERSION: ${BUILD_VERSION}")
+    endif()
 else()
-    set(PROJECT_VERSION 0.0.0)
+    set(PROJECT_VERSION "0.0.0")
 endif()
 
 project(DreamDownloader
