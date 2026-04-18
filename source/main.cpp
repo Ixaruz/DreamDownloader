@@ -61,7 +61,8 @@ int main(int argc, char* argv[])
         printf("Invalid/no game detected.\n");
         hasError = true;
     }
-    if (!hasError && !validator.validateVersion()) {
+    u64 tokenOffset = 0;
+    if (!hasError && !(tokenOffset = validator.getTokenOffset())) {
         printf("Invalid/no game version detected.\n");
         hasError = true;
     }
@@ -78,7 +79,6 @@ int main(int argc, char* argv[])
             printf("Failed to attach to process: %d\n", R_DESCRIPTION(r));
         }
         Debugger::CheatProcessMetadata metadata = debugger.getCheatProcessMetadata();
-        u64 tokenOffset = 0x4B80678;
         u8 token[0x5c];
         printf("Process ID: %d\n", metadata.process_id);
         printf("Title ID: 0x%016llx\n", metadata.program_id);

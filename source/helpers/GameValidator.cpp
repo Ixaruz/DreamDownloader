@@ -1,6 +1,6 @@
 #include <helpers/GameValidator.hpp>
 
-#include <vector>
+#include <map>
 #include <string.h>
 #include <stdio.h>
 
@@ -9,9 +9,10 @@ namespace // anonymous
     u64 const supportedTitleId = 0x01006F8002326000; // ACNH...
 
 
-    std::vector<std::string> const knownSupportedVersions = {
-        "3.0.0",
-        "3.0.1",
+    std::map<std::string, u64> const knownSupportedVersionsAndTokenOffset = {
+        {"3.0.0", 0x4B80678},
+        {"3.0.1", 0x4B80678},
+        {"3.0.2", 0x4B81678},
     };
 
 }
@@ -39,22 +40,22 @@ bool GameValidator::validateGame()
     return true;
 }
 
-bool GameValidator::validateVersion()
+u64 GameValidator::getTokenOffset()
 {
     size_t actualSize = 0;
     Result rc = nsGetApplicationControlData(NsApplicationControlSource_StorageOnly, titleId_, &controlData_, sizeof(controlData_), &actualSize);
     if(R_SUCCEEDED(rc)) {
         versionString_ = std::string(controlData_.nacp.display_version);
-        for (const auto& supportedVersion : knownSupportedVersions) {
-            if (versionString_ == supportedVersion) {
-                return true;
+        for (const auto& supportedVersion : knownSupportedVersionsAndTokenOffset) {
+            if (versionString_ == supportedVersion.first) {
+                return supportedVersion.second;
             }
         }
     }
     else {
         printf("Failed to get application control data: %d\n", R_DESCRIPTION(rc));
     }
-    return false;
+    return 0;
 }
 
 GameValidator::~GameValidator()

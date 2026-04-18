@@ -9,7 +9,7 @@ public:
     ~GameValidator();
 
     bool validateGame();
-    bool validateVersion();
+    u64 getTokenOffset();
 
 private:
     u64 titleId_, processId_;
